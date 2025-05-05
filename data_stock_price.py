@@ -3,6 +3,12 @@ import requests
 from bs4 import BeautifulSoup
 import time
 import os
+from io import StringIO
+from tqdm import tqdm
+
+# BASE_DIR에 데이터를 저장할 경로를 지정하세요.
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from autils import data_dir
 from autils.db import SqLite
@@ -41,7 +47,7 @@ def crawl_date_by_date(code, date):
     response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, "html.parser")
     table = soup.find("table")    
-    temp = pd.read_html(soup.decode_contents())[0]
+    temp = pd.read_html(StringIO(soup.decode_contents()))[0]
     temp.dropna(inplace=True)
 
     last_page_num = soup.select(".pgRR")[0].select("a")[0].get_attribute_list("href")[0].split("=")[-1]
@@ -56,13 +62,13 @@ def crawl_date_by_date(code, date):
         response = requests.get(url, headers=headers)
         soup = BeautifulSoup(response.text, "html.parser")
         table = soup.find("table")
-        temp = pd.read_html(soup.decode_contents())[0]
+        temp = pd.read_html(StringIO(soup.decode_contents()))[0]
         temp.dropna(inplace=True)
         time.sleep(1)
 
         return temp
     
-    for p in range(2, last_page_num+1):  # 여기 range로 수정했습니다
+    for p in tqdm(range(2, last_page_num+1)):  # 여기 range로 수정했습니다
         df_lst.append(get_table_by_page(code, date, p))
 
     total = pd.concat(df_lst, axis=0)
@@ -102,7 +108,7 @@ def create_5min_candle(df):
     resampled['거래대금'] = df['거래대금'].resample('5min').sum()
     
     # 결측값 처리
-    resampled = resampled.fillna(method='ffill')
+    resampled = resampled.ffill()
     
     # 인덱스를 컬럼으로 변환하여 반환
     resampled = resampled.reset_index()
@@ -167,6 +173,14 @@ def get_5m_by_date(code, date):
         raw_df = crawl_date_by_date(code, date)
         df = create_5min_candle(raw_df)
         save_to_db(code, date, df)
+        df = df.rename(columns = {
+            "체결시각":"time",
+            "시가":"open",
+            "고가":"high",
+            "저가":"low",
+            "종가":"close",
+            "거래량":"volume",
+            "거래대금":"trading_value"})
     
     return df
 
@@ -175,6 +189,6 @@ if __name__=="__main__":
     init_db()
     
     # 데이터 가져오기
-    df = get_5m_by_date("005930", "20250430")
+    df = get_5m_by_date("005930", "20250428")
     print(df.head())
     
