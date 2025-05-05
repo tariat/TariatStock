@@ -6,10 +6,6 @@ import os
 from io import StringIO
 from tqdm import tqdm
 
-# BASE_DIR에 데이터를 저장할 경로를 지정하세요.
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from autils import data_dir
 from autils.db import SqLite
 db = SqLite(f"{data_dir}/stock_5m_data.db")
